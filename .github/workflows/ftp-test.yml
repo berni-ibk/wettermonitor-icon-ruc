@@ -1,0 +1,60 @@
+
+name: World4You FTP-Verbindungstest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ftp-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verschlüsselte FTP-Verbindung prüfen
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import os
+          import ftplib
+          import ssl
+
+          host = os.environ["FTP_HOST"]
+          user = os.environ["FTP_USER"]
+          password = os.environ["FTP_PASSWORD"]
+
+          ftp = ftplib.FTP_TLS(
+              context=ssl.create_default_context(),
+              timeout=20
+          )
+
+          try:
+              print("Verbinde mit World4You über FTPS ...")
+
+              ftp.connect(host, 21)
+              ftp.auth()
+              ftp.login(user, password)
+              ftp.prot_p()
+              ftp.set_pasv(True)
+
+              print("FTPS-Anmeldung erfolgreich.")
+              print("Verschlüsselte Datenübertragung aktiviert.")
+
+              directory = ftp.pwd()
+              print("FTP-Startverzeichnis:", directory)
+
+              ftp.nlst()
+              print("Verzeichniszugriff erfolgreich.")
+              print("FTP-VERBINDUNGSTEST ERFOLGREICH")
+
+          finally:
+              try:
+                  ftp.quit()
+              except Exception:
+                  ftp.close()
+          PY
