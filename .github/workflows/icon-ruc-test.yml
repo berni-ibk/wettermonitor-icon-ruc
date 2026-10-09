@@ -1,0 +1,70 @@
+
+name: ICON-D2-RUC Testlauf
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wetterkarten-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Bibliotheken installieren
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: ICON-D2-RUC-Karten erzeugen
+        env:
+          MPLBACKEND: Agg
+          PYTHONUNBUFFERED: '1'
+        run: python icon_ruc_github.py
+
+      - name: Ergebnis prüfen
+        run: |
+          test -f output/icon_d2_ruc_tirol_metadata.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(
+              Path('output/icon_d2_ruc_tirol_metadata.json')
+              .read_text(encoding='utf-8')
+          )
+
+          for key in (
+              'temperature_2m',
+              'precipitation',
+              'precipitation_sum',
+              'cloud_cover'
+          ):
+              frames = data['parameters'][key]['frames']
+              assert len(frames) == 12
+              for frame in frames:
+                  assert (Path('output') / frame['image']).is_file()
+                  assert (Path('output') / frame['values_image']).is_file()
+
+          print('Alle vier Parameter vollständig.')
+          PY
+
+      - name: Testdateien speichern
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: icon-d2-ruc-testdaten
+          path: output/
+          retention-days: 3
+          if-no-files-found: error
