@@ -1,0 +1,7 @@
+numpy
+scipy
+matplotlib
+requests
+pillow
+eccodes
+netCDF4
