@@ -51,19 +51,17 @@ PARAMS = {
 }
 
 
-# Niederschlag: bereits ab den kleinsten Mengen leicht blau sichtbar,
-# mit weichem Uebergang zu kraeftigem Blau bei hoeheren Intensitaeten.
-# Reine Trockengebiete bleiben transparent, aber schon minimaler Niederschlag
-# wird nicht mehr weiss dargestellt.
+# Niederschlag: klar erkennbares Blau schon bei kleinsten positiven Mengen.
+# Trockengebiete (exakt 0 mm) bleiben transparent, jeder positive Wert wird
+# mit einem bereits deutlich blauen Farbton dargestellt.
 RAIN_CMAP = LinearSegmentedColormap.from_list('ruc_blau', [
-    (0.00, '#eaf4ff'),  # 0 mm: sehr zartes Blau statt Weiss
-    (0.03, '#dcefff'),  # Spur Niederschlag
-    (0.08, '#c4e3ff'),
-    (0.18, '#97cbf3'),
-    (0.35, '#5faadf'),
-    (0.55, '#2e87c9'),
-    (0.75, '#1363ad'),
-    (1.00, '#082d73')   # hoehere Mengen: tiefes Blau
+    (0.00, '#2489e2'),  # Schon 0.01 bis 0.02 mm: deutliches Blau
+    (0.05, '#167bd6'),
+    (0.12, '#0e6ac6'),
+    (0.25, '#0b56af'),
+    (0.50, '#093f92'),
+    (0.75, '#082d75'),
+    (1.00, '#06194f')   # Sehr große Niederschlagsmengen
 ], N=256)
 
 def get_cmap(param):
@@ -219,7 +217,12 @@ def create_maps(values,valid,param,overlay_path,value_path):
     # Beim Niederschlag bleiben trockene Flächen transparent:
     # Das Gelände der Grundkarte bleibt dadurch sichtbar.
     if param in ('precipitation','precipitation_sum'):
-        rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.001),255,0).astype(np.uint8)
+        rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.0),255,0).astype(np.uint8)
+    if param in ('precipitation','precipitation_sum'):
+        n_visible=int(np.count_nonzero(rgba[:,:,3]))
+        n_valid=int(np.count_nonzero(render_valid))
+        sample=tuple(int(v) for v in rgba[rgba[:,:,3]>0][0,:3]) if n_visible else None
+        print(f'    BLAUKONTROLLE {overlay_path.name}: {n_visible} sichtbare Niederschlags-Pixel / {n_valid} gueltige Pixel; Beispiel-RGB={sample}',flush=True)
     Image.fromarray(rgba,'RGBA').save(overlay_path,optimize=True)
     del rgba,rendered
     sampled=np.ma.asarray(interp(VX,VY))
