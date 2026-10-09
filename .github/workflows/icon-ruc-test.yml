@@ -62,7 +62,7 @@ jobs:
               'precipitation',
               'precipitation_sum',
               'cloud_cover',
-              'wind_gust',
+              'wind_gusts',
               'snowfall'
           ):
               assert parameter in data['parameters'], (
