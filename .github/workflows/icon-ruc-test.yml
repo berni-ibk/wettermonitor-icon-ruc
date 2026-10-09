@@ -3,9 +3,15 @@ name: ICON-D2-RUC Testlauf
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '55 * * * *'
 
 permissions:
   contents: read
+
+concurrency:
+  group: icon-d2-ruc-test
+  cancel-in-progress: false
 
 jobs:
   wetterkarten-test:
@@ -52,12 +58,14 @@ jobs:
               'cloud_cover'
           ):
               frames = data['parameters'][key]['frames']
-              assert len(frames) == 12
+              assert len(frames) == 12, f'{key}: {len(frames)} statt 12 Stunden'
+
               for frame in frames:
                   assert (Path('output') / frame['image']).is_file()
                   assert (Path('output') / frame['values_image']).is_file()
 
-          print('Alle vier Parameter vollständig.')
+          print('Alle vier Parameter mit je 12 Stunden sind vollständig.')
+          print('Modelllauf:', data['model_run_utc'])
           PY
 
       - name: Testdateien speichern
@@ -66,5 +74,5 @@ jobs:
         with:
           name: icon-d2-ruc-testdaten
           path: output/
-          retention-days: 3
+          retention-days: 2
           if-no-files-found: error
