@@ -1,4 +1,5 @@
-name: ICON-D2-RUC Testlauf
+
+name: ICON-D2-RUC Wetterkarten
 
 on:
   workflow_dispatch:
@@ -7,15 +8,21 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: icon-d2-ruc-test
+  group: icon-d2-ruc-pages
   cancel-in-progress: false
 
 jobs:
-  wetterkarten-test:
+  wetterkarten:
     runs-on: ubuntu-latest
     timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
@@ -31,33 +38,58 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: ICON-D2-RUC-Karten erzeugen
+      - name: ICON-D2-RUC-Wetterkarten erzeugen
         env:
           MPLBACKEND: Agg
           PYTHONUNBUFFERED: '1'
         run: python icon_ruc_github.py
 
-      - name: Ergebnis prüfen
+      - name: Vollstaendigkeit der Wetterdaten pruefen
         run: |
-          test -f output/icon_d2_ruc_tirol_metadata.json
           python - <<'PY'
           import json
           from pathlib import Path
-          data=json.loads(Path('output/icon_d2_ruc_tirol_metadata.json').read_text(encoding='utf-8'))
-          for key in ('temperature_2m','precipitation','precipitation_sum','cloud_cover'):
-              frames=data['parameters'][key]['frames']
-              assert len(frames)==12, f'{key}: {len(frames)} statt 12 Stunden'
+
+          output = Path('output')
+          metadata_file = output / 'icon_d2_ruc_tirol_metadata.json'
+
+          assert metadata_file.is_file(), 'Metadatendatei fehlt'
+
+          data = json.loads(
+              metadata_file.read_text(encoding='utf-8')
+          )
+
+          for parameter in (
+              'temperature_2m',
+              'precipitation',
+              'precipitation_sum',
+              'cloud_cover'
+          ):
+              item = data['parameters'][parameter]
+              frames = item['frames']
+
+              assert len(frames) == 12
+              assert (output / item['legend']).is_file()
+
               for frame in frames:
-                  assert (Path('output')/frame['image']).is_file()
-                  assert (Path('output')/frame['values_image']).is_file()
-          print('Alle vier Parameter mit je 12 Stunden sind vollständig.')
+                  assert (output / frame['image']).is_file()
+                  assert (output / frame['values_image']).is_file()
+
+          print('Alle Wetterdaten vollständig.')
+          print('Modelllauf:', data['model_run_utc'])
           PY
 
-      - name: Testdateien speichern
-        if: success()
-        uses: actions/upload-artifact@v4
+      - name: GitHub Pages vorbereiten
+        run: touch output/.nojekyll
+
+      - name: GitHub Pages konfigurieren
+        uses: actions/configure-pages@v5
+
+      - name: Wetterdateien bereitstellen
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: icon-d2-ruc-testdaten
           path: output/
-          retention-days: 2
-          if-no-files-found: error
+
+      - name: Auf GitHub Pages veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
