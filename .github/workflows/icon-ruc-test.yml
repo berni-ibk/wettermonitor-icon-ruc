@@ -17,11 +17,9 @@ concurrency:
 
 jobs:
   wetterkarten:
+    name: Wetterkarten erzeugen
     runs-on: ubuntu-latest
     timeout-minutes: 55
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Repository laden
@@ -44,7 +42,7 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: python icon_ruc_github.py
 
-      - name: Vollstaendigkeit der Wetterdaten pruefen
+      - name: Vollständigkeit der Wetterdaten prüfen
         run: |
           python - <<'PY'
           import json
@@ -63,19 +61,30 @@ jobs:
               'temperature_2m',
               'precipitation',
               'precipitation_sum',
-              'cloud_cover'
+              'cloud_cover',
+              'wind_gust',
+              'snowfall'
           ):
+              assert parameter in data['parameters'], (
+                  f'Parameter fehlt: {parameter}'
+              )
+
               item = data['parameters'][parameter]
               frames = item['frames']
 
-              assert len(frames) == 12
-              assert (output / item['legend']).is_file()
+              assert len(frames) == 12, (
+                  f'Nicht 12 Stunden: {parameter}'
+              )
+
+              assert (output / item['legend']).is_file(), (
+                  f'Legende fehlt: {parameter}'
+              )
 
               for frame in frames:
                   assert (output / frame['image']).is_file()
                   assert (output / frame['values_image']).is_file()
 
-          print('Alle Wetterdaten vollständig.')
+          print('Alle 6 Wetterparameter vollständig.')
           print('Modelllauf:', data['model_run_utc'])
           PY
 
@@ -90,6 +99,17 @@ jobs:
         with:
           path: output/
 
+  veroeffentlichen:
+    name: Auf GitHub Pages veröffentlichen
+    needs: wetterkarten
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
       - name: Auf GitHub Pages veröffentlichen
         id: deployment
         uses: actions/deploy-pages@v4
