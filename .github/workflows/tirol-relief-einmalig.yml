@@ -32,7 +32,7 @@ jobs:
           assert file.is_file(), 'Relief wurde nicht erzeugt'
           with Image.open(file) as img:
               print('Bildgröße:', img.size, 'Format:', img.format)
-              assert img.size == (1600, 1200), 'Unerwartete Bildabmessungen'
+              assert img.size == (2200, 1500), 'Unerwartete Bildabmessungen'
           print('Dateigröße:', round(file.stat().st_size / 1048576, 2), 'MiB')
           PY
       - name: Relief zum einmaligen Herunterladen bereitstellen
