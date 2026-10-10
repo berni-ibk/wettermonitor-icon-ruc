@@ -6,8 +6,7 @@ Ausgabe: zwei vereinfachte GeoJSON-Dateien, zum lokalen Hosting.
 import json
 from pathlib import Path
 import requests
-from shapely.geometry import shape, mapping
-from shapely.ops import unary_union
+from shapely.geometry import shape, mapping, Point
 
 BASE = 'https://gis.geosphere.at/maps/rest/services/grenzen/admin_grenzen_oesterreich/MapServer'
 OUT = Path('grenzen_tirol')
@@ -25,16 +24,24 @@ def load(layer):
     return data['features']
 
 states=load(0)
-matching=[]
+# Landesfläche anhand der bekannten Lage von Innsbruck bestimmen.
+# Die GIS-Layer können nur technische Attribute (OBJECTID usw.) enthalten.
+innsbruck = Point(11.404, 47.269)
+matching = []
 for feature in states:
-    props=feature.get('properties') or {}
-    if any('tirol' in str(v).casefold() for v in props.values()):
-        matching.append(feature)
-if len(matching)!=1:
-    raise RuntimeError(f'Erwarte genau ein Bundesland Tirol; gefunden {len(matching)}. Attribute: {[x.get("properties") for x in states[:2]]}')
-tirol=shape(matching[0]['geometry'])
-if tirol.is_empty or not tirol.is_valid:
-    tirol=tirol.buffer(0)
+    geometry = shape(feature['geometry'])
+    if geometry.covers(innsbruck):
+        matching.append(geometry)
+if len(matching) != 1:
+    raise RuntimeError(
+        f'Bundesland über Innsbruck nicht eindeutig: {len(matching)} Treffer '
+        f'in Layer 0 ({len(states)} Objekte). GIS-Layer prüfen.'
+    )
+tirol = matching[0]
+if not tirol.is_valid:
+    tirol = tirol.buffer(0)
+if tirol.is_empty:
+    raise RuntimeError('Leere Tirol-Geometrie')
 # Gut für Übersichtskarten, auch auf Smartphones: weniger Daten ohne sichtbare Unterschiede.
 tirol_simple=tirol.simplify(0.0008,preserve_topology=True)
 districts=load(1)
