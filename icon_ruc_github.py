@@ -1,6 +1,6 @@
 # ============================================================
 # WETTERMONITOR.AT – ICON-D2-RUC TIROL
-# 12 Prognosestunden, Temperatur, Niederschlag 1 h, Niederschlagssumme und Bewölkung
+# 24 Prognosestunden, 9 Parameter einschließlich Niederschlagssumme, Bewölkung, Böen und Schnee
 # + echte interpolierte Modellwerte für Klick-Popups
 # Ausführung auf GitHub Actions (keine Colab-Abhängigkeit)
 # ============================================================
@@ -31,7 +31,7 @@ LAT_MIN,LAT_MAX = 46.65,47.85
 GRID_MARGIN = 0.15
 WIDTH,HEIGHT = 1600,1200
 VALUE_WIDTH,VALUE_HEIGHT = 800,600
-HOURS = list(range(1,13))
+HOURS = list(range(1,25))
 
 # Standorte, deren interpolierte RUC-Modellwerte zusätzlich direkt
 # in die Metadaten geschrieben werden. Diese Punktwerte werden vom
@@ -469,14 +469,14 @@ JSON_FILE=OUT/'icon_d2_ruc_tirol_metadata.json'
 JSON_FILE.write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding='utf-8')
 for param in PARAMS:
     frames=metadata['parameters'][param]['frames']
-    if len(frames)!=12: raise RuntimeError('Fehlende Stunden bei '+param)
+    if len(frames)!=24: raise RuntimeError('Fehlende Stunden bei '+param)
     for frame in frames:
         for field in ('image','values_image'):
             path=OUT/frame[field]
             if not path.exists(): raise RuntimeError('Fehlende Datei: '+str(path))
             with Image.open(path) as im: im.verify()
     with Image.open(OUT/PARAMS[param]['legend']) as im: im.verify()
-    print(param+': 12 Wetterbilder und 12 Wertebilder geprüft')
+    print(param+': 24 Wetterbilder und 24 Wertebilder geprüft')
 size=sum(p.stat().st_size for p in OUT.iterdir() if p.is_file())
 print('\nModelllauf UTC:',selected_run.isoformat())
 print('Gesamtgröße der Wetterdateien:',round(size/1024**2,2),'MB')
@@ -484,7 +484,5 @@ print('Anzahl Ausgabedateien:',len(list(OUT.iterdir())))
 for param in PARAMS:
     print('\nVorschau',PARAMS[param]['name'],'+6 h')
 shutil.rmtree(TMP,ignore_errors=True)
-zip_path=shutil.make_archive('ICON_D2_RUC_Tirol_4_Parameter_mit_Werten','zip',root_dir=OUT)
-print(f'\n✅ Alle {12*len(PARAMS)} Karten und {12*len(PARAMS)} Wertebilder erstellt und geprüft.')
-print('ZIP:',zip_path)
-print('Die ZIP-Datei wird durch GitHub Actions als Test-Artefakt gespeichert.')
+print(f'\n✅ Alle {24*len(PARAMS)} Karten und {24*len(PARAMS)} Wertebilder erstellt und geprüft.')
+print('Bereit zur vollständigen GitHub-Pages-Prüfung und Veröffentlichung.')
