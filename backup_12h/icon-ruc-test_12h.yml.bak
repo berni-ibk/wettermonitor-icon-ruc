@@ -1,1 +1,115 @@
 
+name: ICON-D2-RUC Wetterkarten
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '55 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: icon-d2-ruc-pages
+  cancel-in-progress: false
+
+jobs:
+  wetterkarten:
+    name: Wetterkarten erzeugen
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Bibliotheken installieren
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: ICON-D2-RUC-Wetterkarten erzeugen
+        env:
+          MPLBACKEND: Agg
+          PYTHONUNBUFFERED: '1'
+        run: python icon_ruc_github.py
+
+      - name: Vollständigkeit der Wetterdaten prüfen
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          output = Path('output')
+          metadata_file = output / 'icon_d2_ruc_tirol_metadata.json'
+
+          assert metadata_file.is_file(), 'Metadatendatei fehlt'
+
+          data = json.loads(
+              metadata_file.read_text(encoding='utf-8')
+          )
+
+          for parameter in (
+              'temperature_2m',
+              'precipitation',
+              'precipitation_sum',
+              'cloud_cover',
+              'wind_gusts',
+              'snowfall'
+          ):
+              assert parameter in data['parameters'], (
+                  f'Parameter fehlt: {parameter}'
+              )
+
+              item = data['parameters'][parameter]
+              frames = item['frames']
+
+              assert len(frames) == 12, (
+                  f'Nicht 12 Stunden: {parameter}'
+              )
+
+              assert (output / item['legend']).is_file(), (
+                  f'Legende fehlt: {parameter}'
+              )
+
+              for frame in frames:
+                  assert (output / frame['image']).is_file()
+                  assert (output / frame['values_image']).is_file()
+
+          print('Alle 6 Wetterparameter vollständig.')
+          print('Modelllauf:', data['model_run_utc'])
+          PY
+
+      - name: GitHub Pages vorbereiten
+        run: touch output/.nojekyll
+
+      - name: GitHub Pages konfigurieren
+        uses: actions/configure-pages@v5
+
+      - name: Wetterdateien bereitstellen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output/
+
+  veroeffentlichen:
+    name: Auf GitHub Pages veröffentlichen
+    needs: wetterkarten
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Auf GitHub Pages veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
