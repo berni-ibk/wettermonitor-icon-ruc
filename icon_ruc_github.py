@@ -48,6 +48,9 @@ PARAMS = {
  'precipitation':{'dwd':'TOT_PREC','name':'Niederschlag 1 h','unit':'mm','short_names':('tp','TOT_PREC'),'limits':(0,20),'cmap':'ruc_blau','legend':'icon_d2_ruc_niederschlag_legende.png','decimals':2},
  'precipitation_sum':{'dwd':'TOT_PREC','name':'Niederschlagssumme','unit':'mm','short_names':('tp','TOT_PREC'),'limits':(0,50),'cmap':'ruc_blau','legend':'icon_d2_ruc_niederschlagssumme_legende.png','decimals':2},
  'cloud_cover':{'dwd':'CLCT','name':'Bewölkung','unit':'%','short_names':('tcc','CLCT'),'limits':(0,100),'cmap':'cloud_gray','legend':'icon_d2_ruc_bewoelkung_legende.png','decimals':0},
+ 'cloud_low':{'dwd':'CLCL','name':'Bewölkung tief','unit':'%','short_names':('lcc','CLCL'),'limits':(0,100),'cmap':'cloud_gray','legend':'icon_d2_ruc_cloud_low_legende.png','decimals':0},
+ 'cloud_mid':{'dwd':'CLCM','name':'Bewölkung mittel','unit':'%','short_names':('mcc','CLCM'),'limits':(0,100),'cmap':'cloud_gray','legend':'icon_d2_ruc_cloud_mid_legende.png','decimals':0},
+ 'cloud_high':{'dwd':'CLCH','name':'Bewölkung hoch','unit':'%','short_names':('hcc','CLCH'),'limits':(0,100),'cmap':'cloud_gray','legend':'icon_d2_ruc_cloud_high_legende.png','decimals':0},
  'wind_gusts':{'dwd':'VMAX_10M','name':'Windböen','unit':'km/h','short_names':('10fg','VMAX_10M','gust'),'limits':(0,120),'cmap':'gust_ruc','legend':'icon_d2_ruc_boen_legende.png','decimals':1},
  'snowfall':{'dwd':'SNOW_GSP','name':'Schneefall (Wasseräquivalent) 1 h','unit':'mm','short_names':('sf','SNOW_GSP','asnow'),'limits':(0,10),'cmap':'snow_ruc','legend':'icon_d2_ruc_schneefall_legende.png','decimals':2}
 }
@@ -60,6 +63,9 @@ COLOR_LEVELS = {
     'precipitation': [0, 0.05, 0.1, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 15, 20],
     'precipitation_sum': [0, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 12, 20, 30, 50],
     'cloud_cover': [0.0, 8.33333, 16.66667, 25.0, 33.33333, 41.66667, 50.0, 58.33333, 66.66667, 75.0, 83.33333, 91.66667, 100.0],
+    'cloud_low': [0.0, 8.33333, 16.66667, 25.0, 33.33333, 41.66667, 50.0, 58.33333, 66.66667, 75.0, 83.33333, 91.66667, 100.0],
+    'cloud_mid': [0.0, 8.33333, 16.66667, 25.0, 33.33333, 41.66667, 50.0, 58.33333, 66.66667, 75.0, 83.33333, 91.66667, 100.0],
+    'cloud_high': [0.0, 8.33333, 16.66667, 25.0, 33.33333, 41.66667, 50.0, 58.33333, 66.66667, 75.0, 83.33333, 91.66667, 100.0],
     'wind_gusts': [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0],
     'snowfall': [0, 0.05, 0.1, 0.2, 0.4, 0.6, 1, 1.5, 2.5, 4, 6, 8, 10],
 }
@@ -68,6 +74,9 @@ COLOR_STEPS = {
     'precipitation': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
     'precipitation_sum': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
     'cloud_cover': [(0.7, 0.73, 0.77, 0.045), (0.66, 0.69, 0.73, 0.09), (0.61, 0.64, 0.68, 0.15), (0.56, 0.59, 0.63, 0.22), (0.51, 0.54, 0.58, 0.3), (0.46, 0.49, 0.53, 0.39), (0.42, 0.45, 0.49, 0.48), (0.38, 0.41, 0.45, 0.57), (0.34, 0.37, 0.41, 0.66), (0.3, 0.33, 0.37, 0.74), (0.26, 0.29, 0.33, 0.81), (0.23, 0.26, 0.3, 0.87)],
+    'cloud_low': [(0.7, 0.73, 0.77, 0.045), (0.66, 0.69, 0.73, 0.09), (0.61, 0.64, 0.68, 0.15), (0.56, 0.59, 0.63, 0.22), (0.51, 0.54, 0.58, 0.3), (0.46, 0.49, 0.53, 0.39), (0.42, 0.45, 0.49, 0.48), (0.38, 0.41, 0.45, 0.57), (0.34, 0.37, 0.41, 0.66), (0.3, 0.33, 0.37, 0.74), (0.26, 0.29, 0.33, 0.81), (0.23, 0.26, 0.3, 0.87)],
+    'cloud_mid': [(0.7, 0.73, 0.77, 0.045), (0.66, 0.69, 0.73, 0.09), (0.61, 0.64, 0.68, 0.15), (0.56, 0.59, 0.63, 0.22), (0.51, 0.54, 0.58, 0.3), (0.46, 0.49, 0.53, 0.39), (0.42, 0.45, 0.49, 0.48), (0.38, 0.41, 0.45, 0.57), (0.34, 0.37, 0.41, 0.66), (0.3, 0.33, 0.37, 0.74), (0.26, 0.29, 0.33, 0.81), (0.23, 0.26, 0.3, 0.87)],
+    'cloud_high': [(0.7, 0.73, 0.77, 0.045), (0.66, 0.69, 0.73, 0.09), (0.61, 0.64, 0.68, 0.15), (0.56, 0.59, 0.63, 0.22), (0.51, 0.54, 0.58, 0.3), (0.46, 0.49, 0.53, 0.39), (0.42, 0.45, 0.49, 0.48), (0.38, 0.41, 0.45, 0.57), (0.34, 0.37, 0.41, 0.66), (0.3, 0.33, 0.37, 0.74), (0.26, 0.29, 0.33, 0.81), (0.23, 0.26, 0.3, 0.87)],
     'wind_gusts': ['#e9f5dc', '#d3e99c', '#a8d453', '#f2e45e', '#ffc344', '#ffa132', '#f7832e', '#e86428', '#d4413b', '#b92b59', '#913074', '#662381'],
     'snowfall': ['#9edcfb', '#7cccf9', '#58b7f0', '#389fe4', '#2584d7', '#286aca', '#3557bc', '#4549af', '#60319e', '#582785', '#421f6e', '#30135b'],
 }
@@ -182,7 +191,7 @@ def read_grib(path,param):
     elif param=='snowfall':
         if units not in ('kg m**-2','kg m-2','mm'):
             raise RuntimeError('Unbekannte Schneefalleinheit: '+units)
-    elif param=='cloud_cover':
+    elif param in ('cloud_cover','cloud_low','cloud_mid','cloud_high'):
         if units=='1': selected[valid]*=100
         elif units!='%': raise RuntimeError('Bewölkungseinheit: '+units)
         selected[valid]=np.clip(selected[valid],0,100)
@@ -239,7 +248,7 @@ def create_maps(values,valid,param,overlay_path,value_path):
     # Das Gelände der Grundkarte bleibt dadurch sichtbar.
     if param in ('precipitation','precipitation_sum','snowfall'):
         rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.0),255,0).astype(np.uint8)
-    if param == 'cloud_cover':
+    if param in ('cloud_cover','cloud_low','cloud_mid','cloud_high'):
         rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.0),rgba[:,:,3],0).astype(np.uint8)
     if param == 'wind_gusts':
         rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>=20.0),220,0).astype(np.uint8)
@@ -261,7 +270,7 @@ def create_legend(param):
     lo,hi=cfg['limits']
     fig=plt.figure(figsize=(5.8,1.05),dpi=160)
     ax=fig.add_axes([.06,.40,.88,.28])
-    if param=='cloud_cover':
+    if param in ('cloud_cover','cloud_low','cloud_mid','cloud_high'):
         ax.set_facecolor('#e3e9ef')  # Heller Hintergrund für transparente Graustufen
     cb=ColorbarBase(ax,cmap=get_cmap(param),norm=get_norm(param),orientation='horizontal')
     if param=='temperature_2m': ticks=list(range(-5,26,5))
