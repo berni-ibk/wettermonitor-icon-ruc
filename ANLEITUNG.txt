@@ -1,0 +1,31 @@
+TIROL-RELIEF – EINMALIGER GITHUB-ACTIONS-LAUF
+
+WICHTIG: Bitte noch keine WordPress-Seite oder GitHub-Pages-Einstellungen ändern.
+
+1. Im bestehenden öffentlichen GitHub-Repository wettermonitor-icon-ruc die Datei
+   relief_tirol_erzeugen.py in das Hauptverzeichnis hochladen.
+2. Dort auch requirements-relief.txt hochladen. Die bestehende requirements.txt
+   und die laufenden ICON-RUC-Workflows bleiben unverändert.
+3. Eine neue Datei unter .github/workflows/tirol-relief-einmalig.yml anlegen.
+   Den vollständigen Inhalt aus diesem Paket übernehmen.
+4. GitHub -> Actions -> 'Tirol-Relief einmalig erzeugen' -> Run workflow.
+5. Nach Erfolg den Download 'tirol-relief-download' unter Artifacts herunterladen.
+   Das ZIP entpacken; enthalten ist tirol_relief.png (1600x1200 Pixel).
+6. Per FTP nach wettermonitor.at/wp-content/uploads/wetterkarten/tirol_relief.png
+   hochladen. Den Zielordner ggf. anlegen.
+7. Durch Aufruf von https://www.wettermonitor.at/wp-content/uploads/wetterkarten/tirol_relief.png
+   prüfen, ob das Bild abrufbar ist.
+8. Erst DANACH die vorbereiteten HTML-Dateien für Viewer und Startseiten-Vorschau
+   umstellen, sofern ihre Leaflet-Pfade ebenfalls korrekt eingerichtet sind.
+
+Der Workflow hat absichtlich KEIN Pages-Deployment, keinen Zeitplan und
+keinen Schreibzugriff auf das Repository. Die bereits laufende Wetterkarten-
+Veröffentlichung bleibt dadurch unberührt. Das Artefakt wird nur 1 Tag
+aufbewahrt, um unnötigen Speicher zu vermeiden.
+
+QUELLENHINWEIS
+Datengrundlage Mapzen Terrain Tiles, AWS Open Data; enthält weitere Quellen.
+https://registry.opendata.aws/terrain-tiles/
+https://github.com/tilezen/joerd/blob/master/docs/attribution.md
+Vor öffentlicher Veröffentlichung die für Tirol geltenden Quellennennungen
+prüfen und sichtbar am Kartenviewer bereitstellen.
