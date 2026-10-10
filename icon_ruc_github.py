@@ -47,7 +47,7 @@ PARAMS = {
  'temperature_2m':{'dwd':'T_2M','name':'Temperatur 2 m','unit':'°C','short_names':('2t','T_2M'),'limits':(-5,25),'cmap':'turbo','legend':'icon_d2_ruc_legende.png','decimals':1},
  'precipitation':{'dwd':'TOT_PREC','name':'Niederschlag 1 h','unit':'mm','short_names':('tp','TOT_PREC'),'limits':(0,20),'cmap':'ruc_blau','legend':'icon_d2_ruc_niederschlag_legende.png','decimals':2},
  'precipitation_sum':{'dwd':'TOT_PREC','name':'Niederschlagssumme','unit':'mm','short_names':('tp','TOT_PREC'),'limits':(0,50),'cmap':'ruc_blau','legend':'icon_d2_ruc_niederschlagssumme_legende.png','decimals':2},
- 'cloud_cover':{'dwd':'CLCT','name':'Bewölkung','unit':'%','short_names':('tcc','CLCT'),'limits':(0,100),'cmap':'cloud_white','legend':'icon_d2_ruc_bewoelkung_legende.png','decimals':0},
+ 'cloud_cover':{'dwd':'CLCT','name':'Bewölkung','unit':'%','short_names':('tcc','CLCT'),'limits':(0,100),'cmap':'cloud_gray','legend':'icon_d2_ruc_bewoelkung_legende.png','decimals':0},
  'wind_gusts':{'dwd':'VMAX_10M','name':'Windböen','unit':'km/h','short_names':('10fg','VMAX_10M','gust'),'limits':(0,120),'cmap':'gust_ruc','legend':'icon_d2_ruc_boen_legende.png','decimals':1},
  'snowfall':{'dwd':'SNOW_GSP','name':'Schneefall (Wasseräquivalent) 1 h','unit':'mm','short_names':('sf','SNOW_GSP','asnow'),'limits':(0,10),'cmap':'snow_ruc','legend':'icon_d2_ruc_schneefall_legende.png','decimals':2}
 }
@@ -67,7 +67,7 @@ COLOR_STEPS = {
     'temperature_2m': ['#3b2f80', '#466be3', '#3ba0fd', '#1ad2d2', '#32f298', '#80ff53', '#bef434', '#eecf3a', '#fe9e2f', '#f26014', '#d02f05', '#9b0f01'],
     'precipitation': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
     'precipitation_sum': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
-    'cloud_cover': [(1.0, 1.0, 1.0, 0), (1.0, 1.0, 1.0, 0.08), (1.0, 1.0, 1.0, 0.14), (1.0, 1.0, 1.0, 0.21), (1.0, 1.0, 1.0, 0.28), (1.0, 1.0, 1.0, 0.36), (1.0, 1.0, 1.0, 0.44), (1.0, 1.0, 1.0, 0.53), (1.0, 1.0, 1.0, 0.63), (1.0, 1.0, 1.0, 0.73), (1.0, 1.0, 1.0, 0.82), (1.0, 1.0, 1.0, 0.91)],
+    'cloud_cover': [(0.7, 0.73, 0.77, 0.045), (0.66, 0.69, 0.73, 0.09), (0.61, 0.64, 0.68, 0.15), (0.56, 0.59, 0.63, 0.22), (0.51, 0.54, 0.58, 0.3), (0.46, 0.49, 0.53, 0.39), (0.42, 0.45, 0.49, 0.48), (0.38, 0.41, 0.45, 0.57), (0.34, 0.37, 0.41, 0.66), (0.3, 0.33, 0.37, 0.74), (0.26, 0.29, 0.33, 0.81), (0.23, 0.26, 0.3, 0.87)],
     'wind_gusts': ['#e9f5dc', '#d3e99c', '#a8d453', '#f2e45e', '#ffc344', '#ffa132', '#f7832e', '#e86428', '#d4413b', '#b92b59', '#913074', '#662381'],
     'snowfall': ['#9edcfb', '#7cccf9', '#58b7f0', '#389fe4', '#2584d7', '#286aca', '#3557bc', '#4549af', '#60319e', '#582785', '#421f6e', '#30135b'],
 }
@@ -262,7 +262,7 @@ def create_legend(param):
     fig=plt.figure(figsize=(5.8,1.05),dpi=160)
     ax=fig.add_axes([.06,.40,.88,.28])
     if param=='cloud_cover':
-        ax.set_facecolor('#64748b')  # neutraler Hintergrund für Transparenz-Legende
+        ax.set_facecolor('#e3e9ef')  # Heller Hintergrund für transparente Graustufen
     cb=ColorbarBase(ax,cmap=get_cmap(param),norm=get_norm(param),orientation='horizontal')
     if param=='temperature_2m': ticks=list(range(-5,26,5))
     elif param=='precipitation': ticks=[0,1,2,5,10,15,20]
