@@ -1,4 +1,3 @@
-
 name: ICON-D2-RUC Wetterkarten
 
 on:
@@ -17,7 +16,7 @@ concurrency:
 
 jobs:
   wetterkarten:
-    name: Wetterkarten erzeugen
+    name: Wetterkarten erzeugen und vollständig prüfen
     runs-on: ubuntu-latest
     timeout-minutes: 55
 
@@ -42,50 +41,116 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: python icon_ruc_github.py
 
-      - name: Vollständigkeit der Wetterdaten prüfen
+      - name: Alle 24 Stunden und alle 9 Parameter prüfen
+        shell: bash
         run: |
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
+          from datetime import datetime, timezone, timedelta
+          from PIL import Image
 
-          output = Path('output')
-          metadata_file = output / 'icon_d2_ruc_tirol_metadata.json'
+          out = Path('output')
+          meta = out / 'icon_d2_ruc_tirol_metadata.json'
+          if not meta.is_file():
+              raise RuntimeError('Metadatendatei fehlt')
+          data = json.loads(meta.read_text(encoding='utf-8'))
 
-          assert metadata_file.is_file(), 'Metadatendatei fehlt'
-
-          data = json.loads(
-              metadata_file.read_text(encoding='utf-8')
-          )
-
-          for parameter in (
-              'temperature_2m',
-              'precipitation',
-              'precipitation_sum',
-              'cloud_cover',
-              'wind_gusts',
-              'snowfall'
-          ):
-              assert parameter in data['parameters'], (
-                  f'Parameter fehlt: {parameter}'
+          expected = {
+              'temperature_2m', 'precipitation',
+              'precipitation_sum', 'cloud_cover',
+              'cloud_low', 'cloud_mid', 'cloud_high',
+              'wind_gusts', 'snowfall'
+          }
+          params = data.get('parameters', {})
+          if set(params) != expected:
+              raise RuntimeError(
+                  'Parameter-Abweichung: ' +
+                  str(sorted(set(params) ^ expected))
               )
 
-              item = data['parameters'][parameter]
-              frames = item['frames']
+          def parse_time(value):
+              date = datetime.fromisoformat(value.replace('Z', '+00:00'))
+              if date.tzinfo is None:
+                  raise RuntimeError('Zeitstempel ohne Zeitzone')
+              return date.astimezone(timezone.utc)
 
-              assert len(frames) == 12, (
-                  f'Nicht 12 Stunden: {parameter}'
-              )
+          run = parse_time(data['model_run_utc'])
+          now = datetime.now(timezone.utc)
+          age = now - run
+          if not timedelta(0) <= age <= timedelta(hours=8):
+              raise RuntimeError('Modelllauf ist zu alt oder liegt in der Zukunft: ' + str(run))
 
-              assert (output / item['legend']).is_file(), (
-                  f'Legende fehlt: {parameter}'
-              )
+          bounds = data.get('bounds')
+          if not isinstance(bounds, list) or len(bounds) != 2:
+              raise RuntimeError('Kartengrenzen fehlen')
+          encoding = data.get('values_encoding', {})
+          if encoding.get('kind') != 'png-rg16-offset':
+              raise RuntimeError('Werte-PNG-Kodierung unerwartet')
 
+          referenced = {meta.name}
+          image_count = 0
+          for name in sorted(expected):
+              item = params[name]
+              frames = item.get('frames', [])
+              hours = [f.get('forecast_hour') for f in frames]
+              if hours != list(range(1, 25)):
+                  raise RuntimeError(f'Fehlende/unsortierte Stunden bei {name}: {hours}')
               for frame in frames:
-                  assert (output / frame['image']).is_file()
-                  assert (output / frame['values_image']).is_file()
+                  h = frame['forecast_hour']
+                  valid = parse_time(frame['valid_time_utc'])
+                  if valid != run + timedelta(hours=h):
+                      raise RuntimeError(f'Falscher Zeitstempel: {name}, +{h} h')
+                  for field, shape in (
+                      ('image', (1600, 1200)),
+                      ('values_image', (800, 600))
+                  ):
+                      filename = frame[field]
+                      if not isinstance(filename, str) or '/' in filename or '\\' in filename:
+                          raise RuntimeError('Ungültiger Dateiname')
+                      path = out / filename
+                      if not path.is_file() or path.stat().st_size == 0:
+                          raise RuntimeError('Fehlende oder leere Datei: ' + filename)
+                      with Image.open(path) as img:
+                          if img.format != 'PNG' or img.size != shape:
+                              raise RuntimeError('Falsches PNG-Format/Maße: ' + filename)
+                          img.verify()
+                      referenced.add(filename)
+                      image_count += 1
+              legend = item['legend']
+              legendpath = out / legend
+              if not legendpath.is_file() or legendpath.stat().st_size == 0:
+                  raise RuntimeError('Legende fehlt: ' + legend)
+              with Image.open(legendpath) as img:
+                  if img.format != 'PNG':
+                      raise RuntimeError('Legende ist kein PNG: ' + legend)
+                  img.verify()
+              referenced.add(legend)
+              print(f'{name}: 24 Karten + 24 Wertekarten + Legende OK')
 
-          print('Alle 6 Wetterparameter vollständig.')
-          print('Modelllauf:', data['model_run_utc'])
+          if image_count != 432:
+              raise RuntimeError(f'Erwartet 432 Bilddateien, erhalten: {image_count}')
+
+          published = {p.name for p in out.iterdir() if p.is_file()}
+          extra = published - referenced
+          if extra:
+              raise RuntimeError('Unerwartete zusätzliche Dateien: ' + str(sorted(extra)))
+
+          size = sum((out / f).stat().st_size for f in referenced)
+          size_mb = size / 1024**2
+          if size_mb >= 900:
+              raise RuntimeError(f'Zu große Ausgabe: {size_mb:.1f} MiB')
+
+          print(f'24h-Prüfung erfolgreich: 9 Parameter, 432 Wetter-/Werte-PNGs, 9 Legenden')
+          print(f'Modelllauf: {run.isoformat()} | Größe: {size_mb:.2f} MiB')
+          summary = os.getenv('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as stream:
+                  stream.write(f'### ICON-D2-RUC erfolgreich geprüft\n\n')
+                  stream.write(f'- Modelllauf: {run.isoformat()}\n')
+                  stream.write('- 9 Parameter, 24 Stunden, 432 PNGs und 9 Legenden\n')
+                  stream.write(f'- Ausgabe: {size_mb:.2f} MiB\n')
           PY
 
       - name: GitHub Pages vorbereiten
