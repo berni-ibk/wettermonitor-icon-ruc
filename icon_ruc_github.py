@@ -19,7 +19,7 @@ import requests
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 from matplotlib import colormaps
-from matplotlib.colors import Normalize, LinearSegmentedColormap
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.colorbar import ColorbarBase
 from PIL import Image
 from netCDF4 import Dataset
@@ -53,56 +53,30 @@ PARAMS = {
 }
 
 
-# Niederschlag: klar erkennbares Blau schon bei kleinsten positiven Mengen.
-# Trockengebiete (exakt 0 mm) bleiben transparent, jeder positive Wert wird
-# mit einem bereits deutlich blauen Farbton dargestellt.
-RAIN_CMAP = LinearSegmentedColormap.from_list('ruc_blau', [
-    (0.00, '#8ac9f3'),
-    (0.05, '#64b6e9'),
-    (0.10, '#43a2df'),
-    (0.20, '#2389d0'),
-    (0.35, '#1273c1'),
-    (0.50, '#075ca8'),
-    (0.65, '#06498e'),
-    (0.80, '#043775'),
-    (0.92, '#032b62'),
-    (1.00, '#021c47')
-], N=256)
-
-# Bewölkung: Wolken werden als weißer Schleier mit zunehmender Deckkraft
-# dargestellt. Bei 0 % bleibt das Gelände vollständig unverdeckt.
-CLOUD_CMAP = LinearSegmentedColormap.from_list('cloud_white', [
-    (0.00, (1, 1, 1, 0.00)),
-    (0.20, (1, 1, 1, 0.16)),
-    (0.40, (1, 1, 1, 0.30)),
-    (0.60, (1, 1, 1, 0.50)),
-    (0.80, (1, 1, 1, 0.72)),
-    (1.00, (1, 1, 1, 0.90))
-], N=256)
-
-# Böen: Gelb über Orange nach Rot / Violett, schwache Böen transparent.
-GUST_CMAP = LinearSegmentedColormap.from_list('gust_ruc', [
-    (0.00, '#e9f5dc'), (0.15, '#badd6c'), (0.30, '#f7e15d'),
-    (0.45, '#ffad35'), (0.60, '#ed6028'), (0.80, '#b32455'),
-    (1.00, '#662381')
-], N=256)
-
-# Schneefall-Wasseräquivalent: Eisblau bis kräftiges Violett.
-SNOW_CMAP = LinearSegmentedColormap.from_list('snow_ruc', [
-    (0.00, '#9edcfb'), (0.10, '#65bdf5'), (0.25, '#278fda'),
-    (0.50, '#3557bc'), (0.75, '#60319e'), (1.00, '#30135b')
-], N=256)
+# Feste Farbstufen: dieselben Grenzen und Farben wie im HTML-Viewer.
+# Farbübergänge erfolgen sprunghaft, Modell- und Klickwerte bleiben unverändert.
+COLOR_LEVELS = {
+    'temperature_2m': [-5.0, -2.5, 0.0, 2.5, 5.0, 7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0],
+    'precipitation': [0, 0.05, 0.1, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 15, 20],
+    'precipitation_sum': [0, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 12, 20, 30, 50],
+    'cloud_cover': [0.0, 8.33333, 16.66667, 25.0, 33.33333, 41.66667, 50.0, 58.33333, 66.66667, 75.0, 83.33333, 91.66667, 100.0],
+    'wind_gusts': [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0],
+    'snowfall': [0, 0.05, 0.1, 0.2, 0.4, 0.6, 1, 1.5, 2.5, 4, 6, 8, 10],
+}
+COLOR_STEPS = {
+    'temperature_2m': ['#3b2f80', '#466be3', '#3ba0fd', '#1ad2d2', '#32f298', '#80ff53', '#bef434', '#eecf3a', '#fe9e2f', '#f26014', '#d02f05', '#9b0f01'],
+    'precipitation': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
+    'precipitation_sum': ['#8ac9f3', '#65b8eb', '#43a4e0', '#268fd3', '#167dc8', '#086bbb', '#075ca8', '#075099', '#06458b', '#053a7a', '#032e65', '#021c47'],
+    'cloud_cover': [(1.0, 1.0, 1.0, 0), (1.0, 1.0, 1.0, 0.08), (1.0, 1.0, 1.0, 0.14), (1.0, 1.0, 1.0, 0.21), (1.0, 1.0, 1.0, 0.28), (1.0, 1.0, 1.0, 0.36), (1.0, 1.0, 1.0, 0.44), (1.0, 1.0, 1.0, 0.53), (1.0, 1.0, 1.0, 0.63), (1.0, 1.0, 1.0, 0.73), (1.0, 1.0, 1.0, 0.82), (1.0, 1.0, 1.0, 0.91)],
+    'wind_gusts': ['#e9f5dc', '#d3e99c', '#a8d453', '#f2e45e', '#ffc344', '#ffa132', '#f7832e', '#e86428', '#d4413b', '#b92b59', '#913074', '#662381'],
+    'snowfall': ['#9edcfb', '#7cccf9', '#58b7f0', '#389fe4', '#2584d7', '#286aca', '#3557bc', '#4549af', '#60319e', '#582785', '#421f6e', '#30135b'],
+}
 
 def get_cmap(param):
-    if param in ('precipitation','precipitation_sum'):
-        return RAIN_CMAP
-    if param == 'cloud_cover':
-        return CLOUD_CMAP
-    if param == 'wind_gusts':
-        return GUST_CMAP
-    if param == 'snowfall':
-        return SNOW_CMAP
-    return colormaps[PARAMS[param]['cmap']]
+    return ListedColormap(COLOR_STEPS[param], name=param+"_stufen")
+
+def get_norm(param):
+    return BoundaryNorm(COLOR_LEVELS[param], len(COLOR_STEPS[param]), clip=True)
 
 def download(url, path, limit_mb):
     total=0
@@ -257,7 +231,7 @@ def create_maps(values,valid,param,overlay_path,value_path):
     render_valid=~np.ma.getmaskarray(rendered)&np.isfinite(rendered.filled(np.nan))
     cfg=PARAMS[param]
     cmap=get_cmap(param)
-    norm=Normalize(vmin=cfg['limits'][0],vmax=cfg['limits'][1],clip=True)
+    norm=get_norm(param)
     rgba=np.uint8(cmap(norm(rendered.filled(cfg['limits'][0])))*255)
     # Alpha aus der Colormap erhalten: bei Bewölkung entspricht er der Wolkendeckung.
     rgba[:,:,3]=np.where(render_valid,rgba[:,:,3],0).astype(np.uint8)
@@ -265,6 +239,8 @@ def create_maps(values,valid,param,overlay_path,value_path):
     # Das Gelände der Grundkarte bleibt dadurch sichtbar.
     if param in ('precipitation','precipitation_sum','snowfall'):
         rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.0),255,0).astype(np.uint8)
+    if param == 'cloud_cover':
+        rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>0.0),rgba[:,:,3],0).astype(np.uint8)
     if param == 'wind_gusts':
         rgba[:,:,3]=np.where(render_valid & (rendered.filled(0)>=20.0),220,0).astype(np.uint8)
     if param in ('precipitation','precipitation_sum'):
@@ -287,7 +263,7 @@ def create_legend(param):
     ax=fig.add_axes([.06,.40,.88,.28])
     if param=='cloud_cover':
         ax.set_facecolor('#64748b')  # neutraler Hintergrund für Transparenz-Legende
-    cb=ColorbarBase(ax,cmap=get_cmap(param),norm=Normalize(vmin=lo,vmax=hi),orientation='horizontal')
+    cb=ColorbarBase(ax,cmap=get_cmap(param),norm=get_norm(param),orientation='horizontal')
     if param=='temperature_2m': ticks=list(range(-5,26,5))
     elif param=='precipitation': ticks=[0,1,2,5,10,15,20]
     elif param=='precipitation_sum': ticks=[0,5,10,20,30,40,50]
