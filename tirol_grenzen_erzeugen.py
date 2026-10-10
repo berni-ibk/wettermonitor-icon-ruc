@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import requests
 from shapely.geometry import shape, mapping, Point
+from shapely.ops import unary_union
 
 BASE = 'https://gis.geosphere.at/maps/rest/services/grenzen/admin_grenzen_oesterreich/MapServer'
 OUT = Path('grenzen_tirol')
@@ -24,24 +25,41 @@ def load(layer):
     return data['features']
 
 states=load(0)
-# Landesfläche anhand der bekannten Lage von Innsbruck bestimmen.
-# Die GIS-Layer können nur technische Attribute (OBJECTID usw.) enthalten.
-innsbruck = Point(11.404, 47.269)
-matching = []
-for feature in states:
-    geometry = shape(feature['geometry'])
-    if geometry.covers(innsbruck):
-        matching.append(geometry)
-if len(matching) != 1:
-    raise RuntimeError(
-        f'Bundesland über Innsbruck nicht eindeutig: {len(matching)} Treffer '
-        f'in Layer 0 ({len(states)} Objekte). GIS-Layer prüfen.'
-    )
-tirol = matching[0]
+# Tirol besteht aus zwei räumlich getrennten Landesteilen: Nordtirol und Osttirol.
+# Die Quelle liefert diese unter Umständen als ZWEI getrennte Features.
+# Daher beide unabhängig über sichere Referenzpunkte bestimmen.
+reference_points = {
+    'Nordtirol (Innsbruck)': Point(11.404, 47.269),
+    'Osttirol (Lienz)': Point(12.769, 46.828),
+}
+parts = []
+for label, point in reference_points.items():
+    matches = []
+    for feature in states:
+        geometry = shape(feature['geometry'])
+        if not geometry.is_valid:
+            geometry = geometry.buffer(0)
+        if geometry.covers(point):
+            matches.append(geometry)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f'{label}: erwartet genau eine Landesfläche, gefunden {len(matches)}. '
+            'Quell-Daten prüfen.'
+        )
+    parts.append(matches[0])
+    print(f'{label}: Fläche gefunden', flush=True)
+
+# Bei separaten Features entsteht MultiPolygon; bei gemeinsamer Geometrie
+# wird diese durch unary_union nicht doppelt ausgegeben.
+tirol = unary_union(parts)
 if not tirol.is_valid:
     tirol = tirol.buffer(0)
 if tirol.is_empty:
     raise RuntimeError('Leere Tirol-Geometrie')
+for label, point in reference_points.items():
+    if not tirol.covers(point):
+        raise RuntimeError(f'{label} fehlt nach dem Zusammenführen')
+
 # Gut für Übersichtskarten, auch auf Smartphones: weniger Daten ohne sichtbare Unterschiede.
 tirol_simple=tirol.simplify(0.0008,preserve_topology=True)
 districts=load(1)
@@ -54,8 +72,11 @@ for feat in districts:
     if inter.area < geom.area * 0.5:
         continue
     selected.append(inter.simplify(0.0008,preserve_topology=True))
-if len(selected)<8 or len(selected)>10:
-    raise RuntimeError(f'Erwarte 9 Tiroler Bezirke, gefunden {len(selected)}; bitte Quelle prüfen')
+if len(selected) != 9:
+    raise RuntimeError(f'Erwarte 9 Tiroler Bezirke einschließlich Lienz, gefunden {len(selected)}; bitte Quelle prüfen')
+# Absicherung: Der Bezirk Lienz muss enthalten sein.
+if not any(g.covers(reference_points['Osttirol (Lienz)']) for g in selected):
+    raise RuntimeError('Bezirk Lienz fehlt in den Bezirksgrenzen')
 
 def write(filename,geom_list):
     obj={'type':'FeatureCollection','features':[{'type':'Feature','properties':{},'geometry':mapping(g)} for g in geom_list]}
