@@ -32,6 +32,22 @@ GRID_MARGIN = 0.15
 WIDTH,HEIGHT = 1600,1200
 VALUE_WIDTH,VALUE_HEIGHT = 800,600
 HOURS = list(range(1,13))
+
+# Standorte, deren interpolierte RUC-Modellwerte zusätzlich direkt
+# in die Metadaten geschrieben werden. Diese Punktwerte werden vom
+# Modelllauf-Archiv verwendet; die Karten-/PNG-Ausgabe bleibt unverändert.
+POINT_LOCATIONS = {
+    'sieglanger': {
+        'name': 'Sieglanger / Innsbruck-West',
+        'lat': 47.2602,
+        'lon': 11.344,
+    },
+    'innsbruck_flughafen': {
+        'name': 'Innsbruck Flughafen',
+        'lat': 47.2600,
+        'lon': 11.35667,
+    },
+}
 DWD_ROOT = 'https://opendata.dwd.de/weather/nwp/v1/m/icon-d2-ruc/p/'
 GRID_URL = 'https://opendata.dwd.de/weather/lib/cdo/icon_grid_0047_R19B07_L.nc.bz2'
 OUT = Path('output')
@@ -226,6 +242,63 @@ def encode_values_png(values,valid,filename):
     rgba[:,:,3]=255
     Image.fromarray(rgba,'RGBA').save(filename,optimize=True)
 
+def point_values(values, valid, param):
+    """Interpolierte Modellwerte an den beiden Archiv-Standorten."""
+    if np.count_nonzero(valid) < 100:
+        return {}
+
+    lx, ly, lv = lon[valid], lat[valid], values[valid]
+    tri = mtri.Triangulation(lx, ly)
+
+    tri_lon = lx[tri.triangles]
+    tri_lat = ly[tri.triangles]
+    dx = np.diff(
+        np.concatenate([tri_lon, tri_lon[:, :1]], axis=1),
+        axis=1
+    ) * 111.32 * np.cos(np.radians((LAT_MIN + LAT_MAX) / 2))
+    dy = np.diff(
+        np.concatenate([tri_lat, tri_lat[:, :1]], axis=1),
+        axis=1
+    ) * 111.32
+
+    tri.set_mask(
+        np.max(np.sqrt(dx**2 + dy**2), axis=1) > 7
+    )
+
+    interp = mtri.LinearTriInterpolator(tri, lv)
+    decimals = int(PARAMS[param].get('decimals', 2))
+    out = {}
+
+    for key, location in POINT_LOCATIONS.items():
+        sampled = np.ma.asarray(
+            interp(
+                np.array([float(location['lon'])]),
+                np.array([float(location['lat'])])
+            )
+        )
+
+        mask = np.ma.getmaskarray(sampled)
+        raw = sampled.filled(np.nan)
+
+        if (
+            raw.size == 0
+            or bool(mask.ravel()[0])
+            or not np.isfinite(raw.ravel()[0])
+        ):
+            value = None
+        else:
+            value = round(float(raw.ravel()[0]), decimals)
+
+        out[key] = {
+            'name': location['name'],
+            'latitude': float(location['lat']),
+            'longitude': float(location['lon']),
+            'value': value,
+        }
+
+    return out
+
+
 def create_maps(values,valid,param,overlay_path,value_path):
     if np.count_nonzero(valid)<100: raise RuntimeError('Zu wenige gültige Modellpunkte')
     lx,ly,lv=lon[valid],lat[valid],values[valid]
@@ -352,12 +425,12 @@ def process_run(run):
             png=f'icon_d2_ruc_{param}_{hour:03d}.png'
             value_png=f'icon_d2_ruc_{param}_{hour:03d}_werte.png'
             create_maps(values,valid,param,OUT/png,OUT/value_png)
-            frames.append({'forecast_hour':hour,'valid_time_utc':(run_utc+timedelta(hours=hour)).isoformat(),'image':png,'values_image':value_png})
+            frames.append({'forecast_hour':hour,'valid_time_utc':(run_utc+timedelta(hours=hour)).isoformat(),'image':png,'values_image':value_png,'points':point_values(values,valid,param)})
             if param=='precipitation':
                 sum_png=f'icon_d2_ruc_precipitation_sum_{hour:03d}.png'
                 sum_value_png=f'icon_d2_ruc_precipitation_sum_{hour:03d}_werte.png'
                 create_maps(cumulative_sum,cumulative_valid,'precipitation_sum',OUT/sum_png,OUT/sum_value_png)
-                sum_frames.append({'forecast_hour':hour,'valid_time_utc':(run_utc+timedelta(hours=hour)).isoformat(),'image':sum_png,'values_image':sum_value_png})
+                sum_frames.append({'forecast_hour':hour,'valid_time_utc':(run_utc+timedelta(hours=hour)).isoformat(),'image':sum_png,'values_image':sum_value_png,'points':point_values(cumulative_sum,cumulative_valid,'precipitation_sum')})
             print(f'OK | {size/1024:.1f} KB')
         result[param]={'name':cfg['name'],'unit':cfg['unit'],'legend':cfg['legend'],'frames':frames}
         if param=='precipitation':
@@ -387,6 +460,7 @@ metadata={
  'center':[47.2692,11.4041],
  'projection':'EPSG:3857','width':WIDTH,'height':HEIGHT,
  'values_encoding':{'kind':'png-rg16-offset','scale':100,'offset':32768,'missing':65535,'width':VALUE_WIDTH,'height':VALUE_HEIGHT},
+ 'point_locations':POINT_LOCATIONS,
  'parameters':selected_data,
  'parameter':'temperature_2m','image':first['image'],'legend':PARAMS['temperature_2m']['legend'],
  'valid_time_utc':first['valid_time_utc'],'grid_uuid':grid_uuid
