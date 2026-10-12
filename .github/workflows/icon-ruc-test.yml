@@ -94,3 +94,87 @@ jobs:
           for name in sorted(expected):
               item = params[name]
               frames = item.get('frames', [])
+              hours = [f.get('forecast_hour') for f in frames]
+              if hours != list(range(1, 28)):
+                  raise RuntimeError(f'Fehlende/unsortierte Stunden bei {name}: {hours}')
+              for frame in frames:
+                  h = frame['forecast_hour']
+                  valid = parse_time(frame['valid_time_utc'])
+                  if valid != run + timedelta(hours=h):
+                      raise RuntimeError(f'Falscher Zeitstempel: {name}, +{h} h')
+                  for field, shape in (
+                      ('image', (1600, 1200)),
+                      ('values_image', (800, 600))
+                  ):
+                      filename = frame[field]
+                      if not isinstance(filename, str) or '/' in filename or '\\' in filename:
+                          raise RuntimeError('Ungültiger Dateiname')
+                      path = out / filename
+                      if not path.is_file() or path.stat().st_size == 0:
+                          raise RuntimeError('Fehlende oder leere Datei: ' + filename)
+                      with Image.open(path) as img:
+                          if img.format != 'PNG' or img.size != shape:
+                              raise RuntimeError('Falsches PNG-Format/Maße: ' + filename)
+                          img.verify()
+                      referenced.add(filename)
+                      image_count += 1
+              legend = item['legend']
+              legendpath = out / legend
+              if not legendpath.is_file() or legendpath.stat().st_size == 0:
+                  raise RuntimeError('Legende fehlt: ' + legend)
+              with Image.open(legendpath) as img:
+                  if img.format != 'PNG':
+                      raise RuntimeError('Legende ist kein PNG: ' + legend)
+                  img.verify()
+              referenced.add(legend)
+              print(f'{name}: 27 Karten + 27 Wertekarten + Legende OK')
+
+          if image_count != 486:
+              raise RuntimeError(f'Erwartet 486 Bilddateien, erhalten: {image_count}')
+
+          published = {p.name for p in out.iterdir() if p.is_file()}
+          extra = published - referenced
+          if extra:
+              raise RuntimeError('Unerwartete zusätzliche Dateien: ' + str(sorted(extra)))
+
+          size = sum((out / f).stat().st_size for f in referenced)
+          size_mb = size / 1024**2
+          if size_mb >= 900:
+              raise RuntimeError(f'Zu große Ausgabe: {size_mb:.1f} MiB')
+
+          print(f'27h-Prüfung erfolgreich: 9 Parameter, 486 Wetter-/Werte-PNGs, 9 Legenden')
+          print(f'Modelllauf: {run.isoformat()} | Größe: {size_mb:.2f} MiB')
+          summary = os.getenv('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as stream:
+                  stream.write(f'### ICON-D2-RUC erfolgreich geprüft\n\n')
+                  stream.write(f'- Modelllauf: {run.isoformat()}\n')
+                  stream.write('- 9 Parameter, 27 Stunden, 486 PNGs und 9 Legenden\n')
+                  stream.write(f'- Ausgabe: {size_mb:.2f} MiB\n')
+          PY
+
+      - name: GitHub Pages vorbereiten
+        run: touch output/.nojekyll
+
+      - name: GitHub Pages konfigurieren
+        uses: actions/configure-pages@v5
+
+      - name: Wetterdateien bereitstellen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: output/
+
+  veroeffentlichen:
+    name: Auf GitHub Pages veröffentlichen
+    needs: wetterkarten
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Auf GitHub Pages veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
